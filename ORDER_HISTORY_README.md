@@ -56,11 +56,11 @@ const orderStructure = {
     id: 'ORD001',
     date: '2024-01-15',
     status: 'Delivered', // 'Delivered', 'Cancelled', 'Processing'
-    total: '₹485',
+    total: '$48.50',
     items: [
         {
             name: 'Product Name',
-            price: '₹120',
+            price: '$12.00',
             quantity: 1,
             image: 'image_url'
         }

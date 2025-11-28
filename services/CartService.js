@@ -37,7 +37,7 @@ class CartService {
     // Get cart total
     getTotal() {
         return this.cart.reduce((total, item) => {
-            const price = parseInt(item.price.replace('₹', ''));
+            const price = parseFloat(item.price.replace('$', ''));
             return total + (price * item.quantity);
         }, 0);
     }

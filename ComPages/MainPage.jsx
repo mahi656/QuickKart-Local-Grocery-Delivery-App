@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import OrderHistory from '../components/OrderHistory';
 
 const GROCERY_DATA = [
     {
@@ -246,6 +247,20 @@ const CATEGORIES = [
 export default function MainPage() {
     const [searchText, setSearchText] = useState("");
     const [selectedCategory, setSelectedCategory] = useState("All");
+    const [showOrderHistory, setShowOrderHistory] = useState(false);
+
+    const handleRepeatOrder = (items) => {
+        CartService.addItems(items);
+    };
+
+    if (showOrderHistory) {
+        return (
+            <OrderHistory
+                onRepeatOrder={handleRepeatOrder}
+                onBack={() => setShowOrderHistory(false)}
+            />
+        );
+    }
 
     const filteredData = GROCERY_DATA.map((section) => {
         // Filter by selected category first
@@ -265,16 +280,19 @@ export default function MainPage() {
 
     const renderItem = ({ item }) => (
         <View style={styles.itemCard}>
-            <Image source={{ uri: item.image }} style={styles.itemImage} />
+            <View style={styles.itemImageContainer}>
+                <Image source={{ uri: item.image }} style={styles.itemImage} />
+            </View>
             <View style={styles.itemInfo}>
                 <Text style={styles.itemName}>{item.name}</Text>
-                <Text style={styles.itemPrice}>
-                    {item.price} <Text style={styles.itemWeight}>/ {item.weight}</Text>
-                </Text>
+                <Text style={styles.itemWeight}>{item.weight}</Text>
+                <View style={styles.priceContainer}>
+                    <Text style={styles.itemPrice}>{item.price}</Text>
+                    <TouchableOpacity style={styles.addButton} onPress={() => CartService.addItem(item)}>
+                        <Ionicons name="add" size={24} color="#fff" />
+                    </TouchableOpacity>
+                </View>
             </View>
-            <TouchableOpacity style={styles.addButton} onPress={() => CartService.addItem(item)}>
-                <Ionicons name="add" size={24} color="#fff" />
-            </TouchableOpacity>
         </View>
     );
 
@@ -300,14 +318,19 @@ export default function MainPage() {
             </View>
 
             <View style={styles.bannerContainer}>
-                <View style={styles.bannerTextContainer}>
-                    <Text style={styles.bannerTitle}>20% OFF</Text>
-                    <Text style={styles.bannerSubtitle}>on your first order</Text>
+                <View style={styles.bannerContent}>
+                    <View style={styles.bannerTextContainer}>
+                        <Text style={styles.bannerTitle}>20% OFF</Text>
+                        <Text style={styles.bannerSubtitle}>on your first order</Text>
+                        <TouchableOpacity style={styles.bannerButton}>
+                            <Text style={styles.bannerButtonText}>Shop Now</Text>
+                        </TouchableOpacity>
+                    </View>
+                    <Image
+                        source={{ uri: "https://placehold.co/200/F1C40F/FFFFFF?text=Veg" }}
+                        style={styles.bannerImage}
+                    />
                 </View>
-                <Image
-                    source={{ uri: "https://placehold.co/200/F1C40F/FFFFFF?text=Veg" }}
-                    style={styles.bannerImage}
-                />
             </View>
 
             <Text style={styles.sectionTitle}>Categories</Text>
@@ -336,6 +359,17 @@ export default function MainPage() {
 
     return (
         <SafeAreaView style={styles.container}>
+            {/* Top Header */}
+            <View style={styles.topHeader}>
+                <Text style={styles.topHeaderTitle}>Grocery Shopping</Text>
+                <TouchableOpacity
+                    style={styles.ordersButton}
+                    onPress={() => setShowOrderHistory(true)}
+                >
+                    <Ionicons name="receipt-outline" size={24} color="#2c3e50" />
+                </TouchableOpacity>
+            </View>
+
             {/* Search Bar */}
             <View style={styles.searchContainer}>
                 <TextInput
@@ -367,98 +401,221 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: "#f8f9fa",
     },
-    searchContainer: {
-        padding: 16,
+    topHeader: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        paddingHorizontal: 16,
+        paddingVertical: 12,
         backgroundColor: "#fff",
         borderBottomWidth: 1,
-        borderBottomColor: "#eee",
-        zIndex: 1,
+        borderBottomColor: "#f0f0f0",
+    },
+    topHeaderTitle: {
+        fontSize: 24,
+        fontWeight: "800",
+        color: "#1A1A1A",
+        letterSpacing: -0.5,
+    },
+    ordersButton: {
+        padding: 10,
+        borderRadius: 12,
+        backgroundColor: "#F5F5F5",
+    },
+    searchContainer: {
+        paddingHorizontal: 20,
+        paddingBottom: 15,
+        backgroundColor: "#fff",
+        borderBottomLeftRadius: 24,
+        borderBottomRightRadius: 24,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+        elevation: 5,
+        zIndex: 10,
     },
     searchInput: {
-        height: 40,
-        borderColor: "#ccc",
-        borderWidth: 1,
-        borderRadius: 8,
-        paddingHorizontal: 10,
-        backgroundColor: "#f9f9f9",
+        height: 50,
+        backgroundColor: "#F3F4F6",
+        borderRadius: 16,
+        paddingHorizontal: 20,
+        fontSize: 16,
+        color: "#1A1A1A",
+        borderWidth: 0,
     },
     listContent: {
-        paddingHorizontal: 16,
-        paddingBottom: 20,
+        paddingHorizontal: 20,
+        paddingBottom: 40,
     },
     header: {
-        backgroundColor: "#f8f9fa",
-        paddingVertical: 12,
+        backgroundColor: "#FAFAFA",
+        paddingVertical: 15,
         marginTop: 10,
     },
     headerTitle: {
-        fontSize: 22,
-        fontWeight: "bold",
-        color: "#2c3e50",
+        fontSize: 20,
+        fontWeight: "700",
+        color: "#1A1A1A",
     },
-    item: {
-        backgroundColor: "#ffffff",
-        padding: 16,
-        marginVertical: 6,
-        borderRadius: 12,
+    headerContainer: {
+        marginBottom: 10,
+    },
+    searchBar: {
+        display: 'none', // Hidden as we moved it to top
+    },
+    bannerContainer: {
+        marginTop: 20,
+        marginBottom: 25,
+        borderRadius: 24,
+        backgroundColor: "#FFF9C4", // Light yellow/beige
+        overflow: "hidden",
+        elevation: 2,
+        shadowColor: "#FBC02D",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+    },
+    bannerContent: {
+        flexDirection: "row",
+        alignItems: "center",
+        padding: 24,
+    },
+    bannerTextContainer: {
+        flex: 1,
+    },
+    bannerTitle: {
+        fontSize: 28,
+        fontWeight: "900",
+        color: "#1A1A1A",
+        marginBottom: 4,
+    },
+    bannerSubtitle: {
+        fontSize: 15,
+        color: "#555",
+        marginBottom: 16,
+        fontWeight: "500",
+    },
+    bannerButton: {
+        backgroundColor: "#1A1A1A",
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        borderRadius: 30,
+        alignSelf: "flex-start",
+    },
+    bannerButtonText: {
+        color: "#fff",
+        fontWeight: "600",
+        fontSize: 13,
+    },
+    bannerImage: {
+        width: 100,
+        height: 100,
+        resizeMode: "contain",
+    },
+    sectionTitle: {
+        fontSize: 20,
+        fontWeight: "700",
+        color: "#1A1A1A",
+        marginBottom: 15,
+    },
+    categoriesScroll: {
+        marginBottom: 10,
+    },
+    categoryCard: {
+        width: 80,
+        height: 90,
+        marginRight: 12,
+        borderRadius: 16,
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 8,
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3.84,
-        elevation: 5,
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
     },
-    title: {
-        fontSize: 18,
-        color: "#34495e",
+    selectedCategoryCard: {
+        borderWidth: 2,
+        borderColor: "#4CAF50",
+    },
+    categoryImage: {
+        width: 40,
+        height: 40,
+        marginBottom: 8,
+    },
+    categoryName: {
+        fontSize: 11,
+        fontWeight: "600",
+        color: "#333",
+        textAlign: "center",
     },
     itemCard: {
         backgroundColor: "#fff",
-        borderRadius: 12,
+        borderRadius: 20,
         padding: 12,
-        marginBottom: 12,
+        marginBottom: 16,
         flexDirection: "row",
         alignItems: "center",
         shadowColor: "#000",
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
         elevation: 3,
+    },
+    itemImageContainer: {
+        width: 80,
+        height: 80,
+        borderRadius: 16,
+        backgroundColor: "#F5F5F5",
+        justifyContent: "center",
+        alignItems: "center",
+        marginRight: 16,
     },
     itemImage: {
         width: 60,
         height: 60,
-        borderRadius: 8,
-        marginRight: 12,
+        resizeMode: "contain",
     },
     itemInfo: {
         flex: 1,
+        justifyContent: "center",
     },
     itemName: {
-        fontSize: 16,
-        fontWeight: "600",
-        color: "#2c3e50",
+        fontSize: 17,
+        fontWeight: "700",
+        color: "#1A1A1A",
         marginBottom: 4,
     },
-    itemPrice: {
-        fontSize: 14,
-        fontWeight: "700",
-        color: "#27ae60",
-    },
     itemWeight: {
-        fontSize: 12,
-        fontWeight: "400",
-        color: "#7f8c8d",
+        fontSize: 13,
+        color: "#888",
+        marginBottom: 8,
+        fontWeight: "500",
+    },
+    priceContainer: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+    },
+    itemPrice: {
+        fontSize: 18,
+        fontWeight: "800",
+        color: "#1A1A1A",
     },
     addButton: {
-        backgroundColor: "#2ecc71",
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+        backgroundColor: "#4CAF50",
+        width: 40,
+        height: 40,
+        borderRadius: 14,
         justifyContent: "center",
         alignItems: "center",
+        shadowColor: "#4CAF50",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 6,
+        elevation: 4,
     },
 });
 

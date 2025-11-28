@@ -248,16 +248,11 @@ export default function MainPage() {
     const [searchText, setSearchText] = useState("");
     const [selectedCategory, setSelectedCategory] = useState("All");
     const [showOrderHistory, setShowOrderHistory] = useState(false);
-    // STATE: Track which screen to show - 'main', 'favorites', or 'orderHistory'
-    const [currentView, setCurrentView] = useState('main');
-    // STATE: Track favorites list and trigger re-renders when favorites change
-    const [favorites, setFavorites] = useState(FavoritesService.getFavorites());
 
     const handleRepeatOrder = (items) => {
         CartService.addItems(items);
     };
 
-    // SCREEN NAVIGATION: Show Order History screen
     if (showOrderHistory) {
         return (
             <OrderHistory
@@ -265,11 +260,6 @@ export default function MainPage() {
                 onBack={() => setShowOrderHistory(false)}
             />
         );
-    }
-
-    // SCREEN NAVIGATION: Show Favorites screen
-    if (currentView === 'favorites') {
-        return <FavoritesScreen onBack={() => setCurrentView('main')} favorites={favorites} setFavorites={setFavorites} />;
     }
 
     const filteredData = GROCERY_DATA.map((section) => {
@@ -288,55 +278,31 @@ export default function MainPage() {
         return { ...section, data: filteredItems };
     }).filter((section) => section !== null);
 
-    // RENDER ITEM CARD: Display individual grocery item with heart icon and add to cart button
-    const renderItem = (item) => {
-        // CHECK: Is this item already in favorites?
-        const isFavorite = FavoritesService.isFavorite(item);
-
-        return (
-            <View key={item.name} style={styles.itemCard}>
-                <View style={styles.cardHeader}>
-                    <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
-                    {/* HEART ICON: Toggle favorite status when clicked */}
-                    <TouchableOpacity onPress={() => {
-                        if (isFavorite) {
-                            // REMOVE FROM FAVORITES: Item is already favorited
-                            FavoritesService.removeFromFavorites(item);
-                        } else {
-                            // ADD TO FAVORITES: Item is not favorited yet
-                            FavoritesService.addToFavorites(item);
-                        }
-                        // UPDATE STATE: Refresh favorites list to trigger re-render
-                        setFavorites(FavoritesService.getFavorites());
-                    }}>
-                        {/* ICON DISPLAY: Show filled heart if favorited, outline if not */}
-                        <Ionicons
-                            name={isFavorite ? "heart" : "heart-outline"}
-                            size={20}
-                            color="#FF6B6B"
-                        />
-                    </TouchableOpacity>
-                </View>
-
-                <View style={styles.itemImageContainer}>
-                    <Image source={{ uri: item.image }} style={styles.itemImage} />
-                </View>
-
-                <View style={styles.cardFooter}>
-                    <View>
-                        <Text style={styles.itemPrice}>{item.price}</Text>
-                        <Text style={styles.itemWeight}>for {item.weight}</Text>
-                    </View>
-                    {/* ADD TO CART BUTTON */}
-                    <TouchableOpacity style={styles.addButton} onPress={() => CartService.addItem(item)}>
-                        <Ionicons name="add" size={24} color="#4CAF50" />
-                    </TouchableOpacity>
-                </View>
+    const renderItem = (item) => (
+        <View key={item.name} style={styles.itemCard}>
+            <View style={styles.cardHeader}>
+                <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
+                <TouchableOpacity>
+                    <Ionicons name="heart-outline" size={20} color="#FF6B6B" />
+                </TouchableOpacity>
             </View>
-        );
-    };
 
-    // BOTTOM NAVIGATION BAR: Main app navigation
+            <View style={styles.itemImageContainer}>
+                <Image source={{ uri: item.image }} style={styles.itemImage} />
+            </View>
+
+            <View style={styles.cardFooter}>
+                <View>
+                    <Text style={styles.itemPrice}>{item.price}</Text>
+                    <Text style={styles.itemWeight}>for {item.weight}</Text>
+                </View>
+                <TouchableOpacity style={styles.addButton} onPress={() => CartService.addItem(item)}>
+                    <Ionicons name="add" size={24} color="#4CAF50" />
+                </TouchableOpacity>
+            </View>
+        </View>
+    );
+
     const BottomNavBar = () => (
         <View style={styles.bottomNavContainer}>
             <TouchableOpacity style={styles.navItem}>
@@ -348,16 +314,8 @@ export default function MainPage() {
             <TouchableOpacity style={styles.navItem}>
                 <Ionicons name="home" size={24} color="#1A1A1A" />
             </TouchableOpacity>
-            {/* FAVORITES NAVIGATION: Navigate to favorites screen */}
-            <TouchableOpacity
-                style={styles.navItem}
-                onPress={() => setCurrentView('favorites')}
-            >
-                <Ionicons
-                    name={currentView === 'favorites' ? "heart" : "heart-outline"}
-                    size={24}
-                    color={currentView === 'favorites' ? "#FF6B6B" : "#1A1A1A"}
-                />
+            <TouchableOpacity style={styles.navItem}>
+                <Ionicons name="heart-outline" size={24} color="#1A1A1A" />
             </TouchableOpacity>
             <TouchableOpacity style={styles.navItem}>
                 <Ionicons name="menu-outline" size={24} color="#1A1A1A" />
@@ -613,152 +571,45 @@ const styles = StyleSheet.create({
         alignItems: "center",
         justifyContent: "center",
     },
-    // FAVORITES SCREEN STYLES
-    backButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 12,
-        backgroundColor: "#F5F5F5",
-        justifyContent: "center",
-        alignItems: "center",
-    },
-    emptyState: {
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-        paddingVertical: 100,
-    },
-    emptyStateText: {
-        fontSize: 20,
-        fontWeight: "700",
-        color: "#1A1A1A",
-        marginTop: 20,
-    },
-    emptyStateSubtext: {
-        fontSize: 14,
-        color: "#888",
-        marginTop: 8,
-    },
-    favoritesContent: {
-        paddingHorizontal: 20,
-        paddingTop: 20,
-        paddingBottom: 100,
-    },
 });
 
-// ============================================================================
-// FAVORITES SCREEN COMPONENT
-// This screen displays all favorited items with options to update and delete
-// ============================================================================
-const FavoritesScreen = ({ onBack, favorites, setFavorites }) => {
-    return (
-        <SafeAreaView style={styles.container}>
-            {/* HEADER: Favorites screen header with back button */}
-            <View style={styles.topHeader}>
-                <TouchableOpacity onPress={onBack} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color="#1A1A1A" />
-                </TouchableOpacity>
-                <Text style={styles.topHeaderTitle}>My Favorites</Text>
-                <View style={{ width: 44 }} />
-            </View>
-
-            {/* CONTENT: Display favorites or empty state */}
-            <ScrollView contentContainerStyle={styles.favoritesContent}>
-                {favorites.length === 0 ? (
-                    // EMPTY STATE: No favorites yet
-                    <View style={styles.emptyState}>
-                        <Ionicons name="heart-outline" size={80} color="#DDD" />
-                        <Text style={styles.emptyStateText}>No favorites yet</Text>
-                        <Text style={styles.emptyStateSubtext}>Start adding items to your favorites!</Text>
-                    </View>
-                ) : (
-                    // FAVORITES GRID: Display all favorited items
-                    <View style={styles.gridContainer}>
-                        {favorites.map((item, index) => (
-                            <View key={index} style={styles.itemCard}>
-                                <View style={styles.cardHeader}>
-                                    <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
-                                    {/* DELETE FROM FAVORITES: Remove button */}
-                                    <TouchableOpacity onPress={() => {
-                                        // REMOVE: Delete this item from favorites
-                                        FavoritesService.removeFromFavorites(item);
-                                        // UPDATE STATE: Refresh favorites list
-                                        setFavorites(FavoritesService.getFavorites());
-                                    }}>
-                                        <Ionicons name="heart" size={20} color="#FF6B6B" />
-                                    </TouchableOpacity>
-                                </View>
-
-                                <View style={styles.itemImageContainer}>
-                                    <Image source={{ uri: item.image }} style={styles.itemImage} />
-                                </View>
-
-                                <View style={styles.cardFooter}>
-                                    <View>
-                                        <Text style={styles.itemPrice}>{item.price}</Text>
-                                        <Text style={styles.itemWeight}>for {item.weight}</Text>
-                                    </View>
-                                    {/* ADD TO CART: Add favorite item to cart */}
-                                    <TouchableOpacity
-                                        style={styles.addButton}
-                                        onPress={() => CartService.addItem(item)}
-                                    >
-                                        <Ionicons name="add" size={24} color="#4CAF50" />
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-                        ))}
-                    </View>
-                )}
-            </ScrollView>
-        </SafeAreaView>
-    );
-};
-
-// ============================================================================
-// CART SERVICE
-// Manages shopping cart functionality - add, update, delete items
-// ============================================================================
+// Cart Service - Easy integration point for cart and checkout features
 class CartServiceImpl {
     constructor() {
         this.cart = [];
         this.listeners = [];
     }
 
-    // ADD ITEMS: Add multiple items to cart (for repeat orders)
+    // Add items to cart (for repeat orders)
     addItems(items) {
         items.forEach(item => {
             const existingItem = this.cart.find(cartItem => cartItem.name === item.name);
             if (existingItem) {
-                // UPDATE: Increment quantity if item already exists
                 existingItem.quantity += item.quantity;
             } else {
-                // ADD: Add new item to cart
                 this.cart.push({ ...item });
             }
         });
         this.notifyListeners();
     }
 
-    // ADD ITEM: Add single item to cart
+    // Add single item to cart
     addItem(item) {
         const existingItem = this.cart.find(cartItem => cartItem.name === item.name);
         if (existingItem) {
-            // UPDATE: Increment quantity if item already exists
             existingItem.quantity += 1;
         } else {
-            // ADD: Add new item with quantity 1
             this.cart.push({ ...item, quantity: 1 });
         }
         this.notifyListeners();
     }
 
-    // GET CART: Retrieve all cart items
+    // Get cart items
     getCart() {
         return this.cart;
     }
 
-    // GET TOTAL: Calculate total cart value
+    // Get cart total
     getTotal() {
         return this.cart.reduce((total, item) => {
             const price = parseFloat(item.price.replace('$', ''));
@@ -766,13 +617,13 @@ class CartServiceImpl {
         }, 0);
     }
 
-    // CLEAR CART: Remove all items from cart
+    // Clear cart
     clearCart() {
         this.cart = [];
         this.notifyListeners();
     }
 
-    // SUBSCRIBE: Listen to cart changes
+    // Subscribe to cart changes
     subscribe(listener) {
         this.listeners.push(listener);
         return () => {
@@ -780,78 +631,15 @@ class CartServiceImpl {
         };
     }
 
-    // NOTIFY: Inform all listeners of cart changes
+    // Notify all listeners of cart changes
     notifyListeners() {
         this.listeners.forEach(listener => listener(this.cart));
     }
 
-    // GET COUNT: Get total number of items in cart
+    // Get cart item count
     getItemCount() {
         return this.cart.reduce((count, item) => count + item.quantity, 0);
     }
 }
 
 export const CartService = new CartServiceImpl();
-
-// ============================================================================
-// FAVORITES SERVICE
-// Manages favorites/wishlist functionality - add, update, delete favorites
-// ============================================================================
-class FavoritesServiceImpl {
-    constructor() {
-        // STORAGE: Array to store all favorited items
-        this.favorites = [];
-    }
-
-    // ADD TO FAVORITES: Add an item to the favorites list
-    addToFavorites(item) {
-        // CHECK: Prevent duplicate favorites
-        const exists = this.favorites.find(fav => fav.name === item.name);
-        if (!exists) {
-            // ADD: Add item to favorites array
-            this.favorites.push({ ...item });
-            console.log(`✅ Added "${item.name}" to favorites`);
-        }
-    }
-
-    // REMOVE FROM FAVORITES: Delete an item from favorites
-    removeFromFavorites(item) {
-        // DELETE: Filter out the item from favorites array
-        this.favorites = this.favorites.filter(fav => fav.name !== item.name);
-        console.log(`❌ Removed "${item.name}" from favorites`);
-    }
-
-    // GET FAVORITES: Retrieve all favorited items
-    getFavorites() {
-        return this.favorites;
-    }
-
-    // IS FAVORITE: Check if an item is in favorites
-    isFavorite(item) {
-        return this.favorites.some(fav => fav.name === item.name);
-    }
-
-    // UPDATE FAVORITE: Update an existing favorite item (e.g., if price changes)
-    updateFavorite(itemName, updatedData) {
-        const index = this.favorites.findIndex(fav => fav.name === itemName);
-        if (index !== -1) {
-            // UPDATE: Merge updated data with existing favorite
-            this.favorites[index] = { ...this.favorites[index], ...updatedData };
-            console.log(`🔄 Updated "${itemName}" in favorites`);
-        }
-    }
-
-    // CLEAR FAVORITES: Remove all favorites
-    clearFavorites() {
-        this.favorites = [];
-        console.log('🗑️ Cleared all favorites');
-    }
-
-    // GET COUNT: Get total number of favorited items
-    getFavoritesCount() {
-        return this.favorites.length;
-    }
-}
-
-// EXPORT: Create singleton instance of FavoritesService
-export const FavoritesService = new FavoritesServiceImpl();

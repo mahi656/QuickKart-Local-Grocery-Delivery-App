@@ -14,9 +14,9 @@ export default function HomePage() {
     <View style={{ flex: 1, backgroundColor: "#fff" }}>
       {/* Full Screen Image Slider */}
       <View style={{ flex: 1 }}>
-        <ScrollView 
-          pagingEnabled 
-          horizontal 
+        <ScrollView
+          pagingEnabled
+          horizontal
           showsHorizontalScrollIndicator={false}
           style={{ flex: 1 }}
         >
@@ -24,10 +24,10 @@ export default function HomePage() {
             <View key={index} style={{ position: 'relative' }}>
               <Image
                 source={{ uri: img }}
-                style={{ 
-                  width: screenWidth, 
+                style={{
+                  width: screenWidth,
                   height: screenHeight,
-                  resizeMode: "cover" 
+                  resizeMode: "cover"
                 }}
               />
             </View>
@@ -36,7 +36,7 @@ export default function HomePage() {
       </View>
 
       {/* Text Content Overlay - Directly on photos */}
-      <View 
+      <View
         style={{
           position: "absolute",
           bottom: 100,
@@ -45,9 +45,9 @@ export default function HomePage() {
           alignItems: "center",
         }}
       >
-        <Text style={{ 
-          fontSize: 32, 
-          fontWeight: "700", 
+        <Text style={{
+          fontSize: 32,
+          fontWeight: "700",
           marginBottom: 15,
           textAlign: "center",
           lineHeight: 38,
@@ -58,10 +58,10 @@ export default function HomePage() {
         }}>
           Fast delivery{"\n"}of delicious food
         </Text>
-        
-        <Text style={{ 
-          fontSize: 16, 
-          color: "white", 
+
+        <Text style={{
+          fontSize: 16,
+          color: "white",
           marginBottom: 30,
           textAlign: "center",
           lineHeight: 22,
@@ -69,7 +69,7 @@ export default function HomePage() {
           textShadowOffset: { width: -1, height: 1 },
           textShadowRadius: 10
         }}>
-          Order food within 3 days and get bonuses.
+          Everything you need, delivered in minutes.
         </Text>
 
         <TouchableOpacity
@@ -90,10 +90,10 @@ export default function HomePage() {
             elevation: 8,
           }}
         >
-          <Text style={{ 
-            color: "white", 
-            fontSize: 18, 
-            fontWeight: "600" 
+          <Text style={{
+            color: "white",
+            fontSize: 18,
+            fontWeight: "600"
           }}>
             Get started
           </Text>

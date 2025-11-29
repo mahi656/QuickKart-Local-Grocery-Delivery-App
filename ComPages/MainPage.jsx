@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { StyleSheet, Text, View, SectionList, TextInput, Image, TouchableOpacity, ScrollView, } from "react-native";
+import { StyleSheet, Text, View, SectionList, TextInput, Image, TouchableOpacity, ScrollView, Animated, Dimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -72,8 +72,47 @@ export default function MainPage() {
     const [selectedCategory, setSelectedCategory] = useState("All");
     const [showOrderHistory, setShowOrderHistory] = useState(false);
     const [cartItemCount, setCartItemCount] = useState(0);
-    const [showFavorites, setShowFavorites] = useState(false);
+    const [activeTab, setActiveTab] = useState("Home");
     const [favorites, setFavorites] = useState([]);
+    const [toastVisible, setToastVisible] = useState(false);
+    const [toastMessage, setToastMessage] = useState("");
+    const [toastType, setToastType] = useState("success"); // success or error
+    const fadeAnim = React.useRef(new Animated.Value(0)).current;
+    const slideAnim = React.useRef(new Animated.Value(100)).current;
+
+    const showToast = (message, type = "success") => {
+        setToastMessage(message);
+        setToastType(type);
+        setToastVisible(true);
+
+        Animated.parallel([
+            Animated.timing(fadeAnim, {
+                toValue: 1,
+                duration: 300,
+                useNativeDriver: true,
+            }),
+            Animated.spring(slideAnim, {
+                toValue: 0,
+                friction: 8,
+                useNativeDriver: true,
+            })
+        ]).start();
+
+        setTimeout(() => {
+            Animated.parallel([
+                Animated.timing(fadeAnim, {
+                    toValue: 0,
+                    duration: 300,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(slideAnim, {
+                    toValue: 100,
+                    duration: 300,
+                    useNativeDriver: true,
+                })
+            ]).start(() => setToastVisible(false));
+        }, 2000);
+    };
 
     // Subscribe to cart and favorites changes
     React.useEffect(() => {
@@ -103,13 +142,13 @@ export default function MainPage() {
         );
     }
 
-    if (showFavorites) {
+    if (activeTab === "Favorites") {
         return (
             <Heart
                 favorites={favorites}
                 onRemove={(item) => FavoritesService.removeItem(item)}
                 onAddToCart={(item) => CartService.addItem(item)}
-                onBack={() => setShowFavorites(false)}
+                onBack={() => setActiveTab("Home")}
             />
         );
     }
@@ -141,7 +180,14 @@ export default function MainPage() {
                         </View>
                     )}
                     <View style={{ flex: 1 }} />
-                    <TouchableOpacity onPress={() => FavoritesService.toggleFavorite(item)}>
+                    <TouchableOpacity onPress={() => {
+                        const isAdded = FavoritesService.toggleFavorite(item);
+                        if (isAdded) {
+                            showToast("Added to favorites", "success");
+                        } else {
+                            showToast("Removed from favorites", "error");
+                        }
+                    }}>
                         <Ionicons
                             name={isFavorite ? "heart" : "heart-outline"}
                             size={20}
@@ -167,32 +213,44 @@ export default function MainPage() {
         );
     };
 
-    const BottomNavBar = () => (
-        <View style={styles.bottomNavContainer}>
-            <TouchableOpacity style={styles.navItem}>
-                <View>
-                    <Ionicons name="cart-outline" size={24} color="#1A1A1A" />
-                    {cartItemCount > 0 && (
-                        <View style={styles.badgeContainer}>
-                            <Text style={styles.badgeText}>{cartItemCount}</Text>
-                        </View>
-                    )}
-                </View>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.navItem}>
-                <Ionicons name="person-outline" size={24} color="#1A1A1A" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.navItem} onPress={() => setShowFavorites(false)}>
-                <Ionicons name="home" size={24} color={!showFavorites ? "#4CAF50" : "#1A1A1A"} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.navItem} onPress={() => setShowFavorites(true)}>
-                <Ionicons name={showFavorites ? "heart" : "heart-outline"} size={24} color={showFavorites ? "#FF6B6B" : "#1A1A1A"} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.navItem}>
-                <Ionicons name="menu-outline" size={24} color="#1A1A1A" />
-            </TouchableOpacity>
-        </View>
-    );
+    const BottomNavBar = () => {
+        const tabs = [
+            { name: 'Cart', icon: 'cart', id: 'Cart', badge: cartItemCount },
+            { name: 'Profile', icon: 'person', id: 'Profile' },
+            { name: 'Home', icon: 'home', id: 'Home' },
+            { name: 'Favorites', icon: 'heart', id: 'Favorites' },
+            { name: 'Menu', icon: 'menu', id: 'Menu' },
+        ];
+
+        return (
+            <View style={styles.bottomNavContainer}>
+                {tabs.map((tab) => {
+                    const isActive = activeTab === tab.id;
+                    return (
+                        <TouchableOpacity
+                            key={tab.id}
+                            style={[styles.navItem, isActive && styles.activeNavItem]}
+                            onPress={() => setActiveTab(tab.id)}
+                            activeOpacity={0.7}
+                        >
+                            <View style={styles.navItemContent}>
+                                <Ionicons
+                                    name={isActive ? tab.icon : `${tab.icon}-outline`}
+                                    size={28}
+                                    color={isActive ? "#4CAF50" : "#000"}
+                                />
+                                {tab.badge > 0 && (
+                                    <View style={styles.badgeContainer}>
+                                        <Text style={styles.badgeText}>{tab.badge}</Text>
+                                    </View>
+                                )}
+                            </View>
+                        </TouchableOpacity>
+                    );
+                })}
+            </View>
+        );
+    };
 
     const ListHeader = () => (
         <View>
@@ -313,7 +371,35 @@ export default function MainPage() {
             </ScrollView>
 
             {/* Bottom Navigation */}
+            {/* Bottom Navigation */}
             <BottomNavBar />
+
+            {/* Toast Notification */}
+            {toastVisible && (
+                <Animated.View
+                    style={[
+                        styles.toastContainer,
+                        {
+                            opacity: fadeAnim,
+                            transform: [{ translateY: slideAnim }]
+                        }
+                    ]}
+                >
+                    <View style={[styles.toastIconContainer, toastType === "error" ? styles.toastError : styles.toastSuccess]}>
+                        <Ionicons
+                            name={toastType === "error" ? "heart-dislike" : "heart"}
+                            size={20}
+                            color={toastType === "error" ? "#fff" : "#FF6B6B"}
+                        />
+                    </View>
+                    <View style={styles.toastContent}>
+                        <Text style={styles.toastTitle}>
+                            {toastType === "error" ? "Removed" : "Success"}
+                        </Text>
+                        <Text style={styles.toastText}>{toastMessage}</Text>
+                    </View>
+                </Animated.View>
+            )}
         </SafeAreaView>
     );
 };
@@ -498,6 +584,23 @@ const styles = StyleSheet.create({
     navItem: {
         alignItems: "center",
         justifyContent: "center",
+        padding: 8,
+    },
+    activeNavItem: {
+        backgroundColor: "#E8F5E9",
+        borderRadius: 30, // Circular when no text
+        width: 50,
+        height: 50,
+        paddingHorizontal: 0,
+        paddingVertical: 0,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    navItemContent: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '100%',
+        height: '100%',
     },
     badgeContainer: {
         position: 'absolute',
@@ -598,6 +701,53 @@ const styles = StyleSheet.create({
         color: '#4CAF50',
         fontWeight: '600',
     },
+    toastContainer: {
+        position: 'absolute',
+        bottom: 110,
+        left: 20,
+        right: 20,
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 16,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+        elevation: 8,
+        zIndex: 1000,
+        borderLeftWidth: 4,
+        borderLeftColor: '#4CAF50',
+    },
+    toastIconContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    toastSuccess: {
+        backgroundColor: '#FFF0F0',
+    },
+    toastError: {
+        backgroundColor: '#FF6B6B',
+    },
+    toastContent: {
+        flex: 1,
+    },
+    toastTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#1A1A1A',
+        marginBottom: 2,
+    },
+    toastText: {
+        color: '#666',
+        fontSize: 13,
+        fontWeight: '500',
+    },
 });
 
 // Cart Service - Easy integration point for cart and checkout features
@@ -680,12 +830,16 @@ class FavoritesServiceImpl {
 
     toggleFavorite(item) {
         const index = this.favorites.findIndex(fav => fav.name === item.name);
+        let added = false;
         if (index > -1) {
             this.favorites.splice(index, 1);
+            added = false;
         } else {
             this.favorites.push(item);
+            added = true;
         }
         this.notifyListeners();
+        return added;
     }
 
     removeItem(item) {
@@ -708,7 +862,7 @@ class FavoritesServiceImpl {
     }
 
     notifyListeners() {
-        this.listeners.forEach(listener => listener(this.favorites));
+        this.listeners.forEach(listener => listener([...this.favorites]));
     }
 }
 

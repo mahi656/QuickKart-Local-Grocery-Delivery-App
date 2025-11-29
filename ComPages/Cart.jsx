@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Image, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, Image, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-export default function Cart({ cartService, onBack }) {
+export default function Cart({ cartService, orderService, onBack, onCheckoutSuccess }) {
     const [cartItems, setCartItems] = useState(cartService.getCart());
     const [total, setTotal] = useState(cartService.getTotal());
 
@@ -14,6 +14,31 @@ export default function Cart({ cartService, onBack }) {
         });
         return unsubscribe;
     }, [cartService]);
+
+    const handleCheckout = () => {
+        if (cartItems.length === 0) return;
+
+        Alert.alert(
+            "Confirm Order",
+            `Place order for ₹${total.toFixed(2)}?`,
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Place Order",
+                    onPress: () => {
+                        if (orderService) {
+                            orderService.placeOrder(cartItems, total.toFixed(2));
+                            cartService.clearCart();
+                            Alert.alert("Success", "Order placed successfully!");
+                            if (onCheckoutSuccess) {
+                                onCheckoutSuccess();
+                            }
+                        }
+                    }
+                }
+            ]
+        );
+    };
 
     if (cartItems.length === 0) {
         return (
@@ -81,9 +106,9 @@ export default function Cart({ cartService, onBack }) {
             <View style={styles.footer}>
                 <View style={styles.totalRow}>
                     <Text style={styles.totalLabel}>Total</Text>
-                    <Text style={styles.totalAmount}>${total.toFixed(2)}</Text>
+                    <Text style={styles.totalAmount}>₹{total.toFixed(2)}</Text>
                 </View>
-                <TouchableOpacity style={styles.checkoutButton}>
+                <TouchableOpacity style={styles.checkoutButton} onPress={handleCheckout}>
                     <Text style={styles.checkoutButtonText}>Checkout</Text>
                 </TouchableOpacity>
             </View>

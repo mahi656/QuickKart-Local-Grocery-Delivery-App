@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -10,84 +10,18 @@ import {
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
 
-// Enhanced mock order data with different statuses
-const MOCK_ORDERS = [
-  {
-    id: "ORD001",
-    date: "2024-01-15",
-    status: "Delivered",
-    total: "₹48.50",
-    items: [
-      {
-        name: "Fresh Apples",
-        price: "₹12.00",
-        quantity: 1,
-        image: "https://images.unsplash.com/photo-1568702846914-96b305d2aaeb?w=400",
-      },
-      {
-        name: "Organic Milk",
-        price: "₹6.50",
-        quantity: 2,
-        image: "https://images.unsplash.com/photo-1550583724-b2692b85b150?w=400",
-      },
-      {
-        name: "Brown Bread",
-        price: "₹4.50",
-        quantity: 1,
-        image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400",
-      },
-    ],
-    deliveryTime: "8 mins",
-    deliveryAddress: "123 Main St, Apartment 4B, Mumbai",
-  },
-  {
-    id: "ORD002",
-    date: "2024-01-12",
-    status: "Cancelled",
-    total: "₹32.00",
-    items: [
-      {
-        name: "Bananas",
-        price: "₹6.00",
-        quantity: 2,
-        image: "https://placehold.co/150/FFD93D/FFFFFF?text=Banana",
-      },
-      {
-        name: "Carrots",
-        price: "₹6.00",
-        quantity: 1,
-        image: "https://placehold.co/150/E17055/FFFFFF?text=Carrot",
-      },
-    ],
-    deliveryTime: "12 mins",
-    deliveryAddress: "123 Main St, Apartment 4B, Mumbai",
-  },
-  {
-    id: "ORD003",
-    date: "2024-01-10",
-    status: "Processing",
-    total: "₹75.25",
-    items: [
-      {
-        name: "Chicken Breast",
-        price: "₹25.00",
-        quantity: 1,
-        image: "https://placehold.co/150/FF6B6B/FFFFFF?text=Chicken",
-      },
-      {
-        name: "Basmati Rice",
-        price: "₹15.25",
-        quantity: 2,
-        image: "https://placehold.co/150/4ECDC4/FFFFFF?text=Rice",
-      },
-    ],
-    deliveryTime: "15 mins",
-    deliveryAddress: "123 Main St, Apartment 4B, Mumbai",
-  },
-];
+export default function OrderHistory({ orderService, onRepeatOrder, onBack }) {
+  const [orders, setOrders] = useState([]);
 
-export default function OrderHistory({ onRepeatOrder, onBack }) {
-  const [orders] = useState(MOCK_ORDERS);
+  useEffect(() => {
+    if (orderService) {
+      setOrders(orderService.getOrders());
+      const unsubscribe = orderService.subscribe((updatedOrders) => {
+        setOrders(updatedOrders);
+      });
+      return unsubscribe;
+    }
+  }, [orderService]);
 
   const getStatusDetails = (status) => {
     switch (status) {
@@ -104,15 +38,23 @@ export default function OrderHistory({ onRepeatOrder, onBack }) {
           icon: "cancel"
         };
       case "Processing":
+      case "Pending":
         return {
           bg: "#FFF3E0",
           text: "#EF6C00",
           icon: "schedule"
         };
-      case "Shipped":
+      case "Accepted":
         return {
           bg: "#E3F2FD",
           text: "#1565C0",
+          icon: "thumb-up"
+        };
+      case "Out for Delivery":
+      case "Shipped":
+        return {
+          bg: "#F3E5F5",
+          text: "#7B1FA2",
           icon: "local-shipping"
         };
       default:

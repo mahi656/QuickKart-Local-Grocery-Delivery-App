@@ -107,7 +107,7 @@ export default function Profile({ onBack, onLogout }) {
                     </View>
                 </View>
 
-                {/* Account Settings */}
+                
                 <Text style={styles.sectionHeader}>Account</Text>
                 <View style={styles.sectionContainer}>
                     <MenuOption

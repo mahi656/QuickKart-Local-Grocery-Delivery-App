@@ -8,7 +8,6 @@ import OrderHistory from '../components/OrderHistory';
 import Heart from './Heart';
 import Cart from './Cart';
 import Profile from './Profile';
-
 import { CATEGORIES } from "../data/categories";
 import { fruitsData } from "../data/fruits";
 import { vegetablesData } from "../data/vegetables";
@@ -67,7 +66,47 @@ const GROCERY_DATA = [
         title: "Meat",
         data: meatData,
     },
+
 ];
+
+const CategoryTabs = ({ selectedCategory, onSelectCategory }) => (
+    <View style={styles.categoriesHeaderContainer}>
+        <Text style={styles.sectionTitle}>Categories</Text>
+        <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoriesScrollContent}
+        >
+            {CATEGORIES.map((cat, index) => {
+                const isSelected = selectedCategory === cat.name;
+                return (
+                    <TouchableOpacity
+                        key={index}
+                        style={[
+                            styles.categoryPill,
+                            isSelected && styles.selectedCategoryPill,
+                        ]}
+                        onPress={() => onSelectCategory(cat.name)}
+                    >
+                        <View style={styles.categoryPillIcon}>
+                            <Ionicons
+                                name={cat.icon}
+                                size={18}
+                                color={isSelected ? "#FFF" : "#757575"}
+                            />
+                        </View>
+                        <Text style={[
+                            styles.categoryPillText,
+                            isSelected && styles.selectedCategoryPillText
+                        ]}>
+                            {cat.name}
+                        </Text>
+                    </TouchableOpacity>
+                );
+            })}
+        </ScrollView>
+    </View>
+);
 
 export default function MainPage() {
     const insets = useSafeAreaInsets();
@@ -226,25 +265,27 @@ export default function MainPage() {
         const isFavorite = favorites.some(fav => fav.name === item.name);
         return (
             <View key={item.name} style={styles.itemCard}>
-                <View style={styles.cardHeader}>
+                <View style={styles.imageHeaderContainer}>
                     {item.discount && (
                         <View style={styles.discountBadge}>
                             <Text style={styles.discountText}>{item.discount}</Text>
                         </View>
                     )}
-                    <View style={{ flex: 1 }} />
-                    <TouchableOpacity onPress={() => {
-                        const isAdded = FavoritesService.toggleFavorite(item);
-                        if (isAdded) {
-                            showToast("Added to favorites", "success");
-                        } else {
-                            showToast("Removed from favorites", "error");
-                        }
-                    }}>
+                    <TouchableOpacity
+                        style={styles.favoriteButton}
+                        onPress={() => {
+                            const isAdded = FavoritesService.toggleFavorite(item);
+                            if (isAdded) {
+                                showToast("Added to favorites", "success");
+                            } else {
+                                showToast("Removed from favorites", "error");
+                            }
+                        }}
+                    >
                         <Ionicons
                             name={isFavorite ? "heart" : "heart-outline"}
-                            size={20}
-                            color="#FF6B6B"
+                            size={18}
+                            color={isFavorite ? "#FF6B6B" : "#B0B0B0"}
                         />
                     </TouchableOpacity>
                 </View>
@@ -253,14 +294,21 @@ export default function MainPage() {
                     <Image source={{ uri: item.image }} style={styles.itemImage} />
                 </View>
 
-                <View style={styles.cardFooter}>
-                    <View>
-                        <Text style={styles.itemPrice}>{item.price}</Text>
-                        <Text style={styles.itemWeight}>for {item.weight}</Text>
+                <View style={styles.itemInfoContainer}>
+                    <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
+                    <Text style={styles.itemWeight}>{item.weight}</Text>
+
+                    <View style={styles.priceContainer}>
+                        <View>
+                            <Text style={styles.itemPrice}>{item.price}</Text>
+                            {item.originalPrice && (
+                                <Text style={styles.originalPrice}>{item.originalPrice}</Text>
+                            )}
+                        </View>
+                        <TouchableOpacity style={styles.addButton} onPress={() => CartService.addItem(item)}>
+                            <Ionicons name="add" size={24} color="#fff" />
+                        </TouchableOpacity>
                     </View>
-                    <TouchableOpacity style={styles.addButton} onPress={() => CartService.addItem(item)}>
-                        <Ionicons name="add" size={24} color="#4CAF50" />
-                    </TouchableOpacity>
                 </View>
             </View>
         );
@@ -346,33 +394,7 @@ export default function MainPage() {
         </Modal>
     );
 
-    const ListHeader = () => (
-        <View>
-            <Text style={styles.sectionTitle}>Categories</Text>
-            <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.categoriesScroll}
-            >
-                {CATEGORIES.map((cat, index) => (
-                    <TouchableOpacity
-                        key={index}
-                        style={[
-                            styles.categoryCard,
-                            { backgroundColor: cat.color },
-                            selectedCategory === cat.name && styles.selectedCategoryCard,
-                        ]}
-                        onPress={() => setSelectedCategory(cat.name)}
-                    >
-                        <View style={styles.categoryIconWrapper}>
-                            <Ionicons name={cat.icon} size={32} color="#1A1A1A" />
-                        </View>
-                        <Text style={styles.categoryName}>{cat.name}</Text>
-                    </TouchableOpacity>
-                ))}
-            </ScrollView>
-        </View >
-    );
+
 
     return (
         <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
@@ -466,10 +488,6 @@ export default function MainPage() {
                                 ))}
                             </View>
                         </View>
-
-                        {/* Show Popular items or other sections for "All" view if desired, 
-                            or just the categories as the main entry point. 
-                            Let's show "Popular" below the categories for quick access. */}
                         {GROCERY_DATA.map((section) => (
                             <View key={section.title} style={styles.sectionContainer}>
                                 <Text style={styles.sectionTitle}>{section.title}</Text>
@@ -481,7 +499,7 @@ export default function MainPage() {
                     </>
                 ) : (
                     <>
-                        <ListHeader />
+                        <CategoryTabs selectedCategory={selectedCategory} onSelectCategory={setSelectedCategory} />
                         {filteredData.map((section) => (
                             <View key={section.title} style={styles.sectionContainer}>
                                 <Text style={styles.sectionTitle}>{section.title}</Text>
@@ -501,12 +519,8 @@ export default function MainPage() {
                     </>
                 )}
             </ScrollView>
-
-            {/* Bottom Navigation */}
-            {/* Bottom Navigation */}
             <BottomNavBar />
 
-            {/* Toast Notification */}
             {toastVisible && (
                 <Animated.View
                     style={[
@@ -539,7 +553,7 @@ export default function MainPage() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "#f8f9fa",
+        backgroundColor: "#F4F6F8",
     },
     topHeader: {
         flexDirection: "row",
@@ -553,6 +567,7 @@ const styles = StyleSheet.create({
     },
     headerLeft: {
         flex: 1,
+        justifyContent: 'center',
     },
     deliverToLabel: {
         fontSize: 12,
@@ -574,45 +589,59 @@ const styles = StyleSheet.create({
     },
     profileButton: {
         padding: 4,
-    },
-    searchContainer: {
-        paddingHorizontal: 20,
-        paddingBottom: 15,
-        backgroundColor: "#fff",
-        borderBottomWidth: 1,
-        borderBottomColor: "#F0F0F0",
-    },
-    searchInner: {
-        flexDirection: "row",
-        alignItems: "center",
-        backgroundColor: "#F5F6F8",
-        borderRadius: 12,
-        paddingHorizontal: 15,
-        height: 48,
-        borderWidth: 1,
-        borderColor: "#EBEBEB",
-    },
-    searchInput: {
-        flex: 1,
-        fontSize: 15,
-        color: "#1A1A1A",
-        paddingHorizontal: 10,
+        backgroundColor: "#f5f5f5",
+        borderRadius: 20,
     },
     listContent: {
-        paddingHorizontal: 20,
-        paddingBottom: 100, // Extra padding for bottom nav
+        paddingHorizontal: 16,
+        paddingBottom: 100,
+        paddingTop: 10,
     },
     sectionContainer: {
         marginBottom: 25,
     },
     sectionTitle: {
-        fontSize: 20,
+        fontSize: 19,
         fontWeight: "700",
-        color: "#1A1A1A",
+        color: "#2C3E50",
         marginBottom: 15,
+        letterSpacing: 0.3,
     },
-    categoriesScroll: {
+    categoriesHeaderContainer: {
         marginBottom: 20,
+    },
+    categoriesScrollContent: {
+        paddingRight: 20,
+    },
+    categoryPill: {
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: "#F5F5F5",
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderRadius: 30,
+        marginRight: 10,
+        elevation: 0,
+    },
+    selectedCategoryPill: {
+        backgroundColor: "#4CAF50",
+        shadowColor: "#4CAF50",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 5,
+    },
+    categoryPillIcon: {
+        marginRight: 6,
+    },
+    categoryPillText: {
+        fontSize: 14,
+        fontWeight: "600",
+        color: "#757575",
+    },
+    selectedCategoryPillText: {
+        color: "#FFF",
+        fontWeight: "700",
     },
     categoryCard: {
         width: 105,
@@ -637,11 +666,6 @@ const styles = StyleSheet.create({
     categoryIconWrapper: {
         marginBottom: 10,
     },
-    categoryImage: {
-        width: 40,
-        height: 40,
-        marginBottom: 8,
-    },
     categoryName: {
         fontSize: 13,
         fontWeight: "700",
@@ -657,62 +681,93 @@ const styles = StyleSheet.create({
         width: "48%",
         backgroundColor: "#fff",
         borderRadius: 20,
-        padding: 12,
+        padding: 10,
         marginBottom: 16,
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.06,
+        shadowRadius: 10,
         elevation: 3,
+        borderWidth: 1,
+        borderColor: "#f0f0f0",
     },
-    cardHeader: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "flex-start",
-        marginBottom: 8,
+    imageHeaderContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        zIndex: 1,
+        height: 24,
+    },
+    discountBadge: {
+        backgroundColor: '#FF6B6B',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 8,
+        justifyContent: 'center',
+    },
+    discountText: {
+        color: '#fff',
+        fontSize: 10,
+        fontWeight: '700',
+    },
+    favoriteButton: {
+        padding: 4,
     },
     itemImageContainer: {
         width: "100%",
-        height: 120,
+        height: 110,
         justifyContent: "center",
         alignItems: "center",
-        marginBottom: 12,
+        marginVertical: 5,
     },
     itemImage: {
-        width: "100%",
+        width: "90%",
         height: "100%",
-        resizeMode: "cover",
-        borderRadius: 12,
+        resizeMode: "contain",
+    },
+    itemInfoContainer: {
+        marginTop: 5,
     },
     itemName: {
-        fontSize: 15,
+        fontSize: 14,
         fontWeight: "700",
-        color: "#1A1A1A",
-        flex: 1,
-        marginRight: 4,
+        color: "#333",
+        marginBottom: 2,
+        height: 38,
     },
-    cardFooter: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
+    itemWeight: {
+        fontSize: 11,
+        color: "#999",
+        fontWeight: "500",
+        marginBottom: 8,
+    },
+    priceContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-end',
     },
     itemPrice: {
         fontSize: 16,
         fontWeight: "800",
         color: "#1A1A1A",
     },
-    itemWeight: {
+    originalPrice: {
         fontSize: 12,
-        color: "#888",
-        fontWeight: "500",
+        color: "#bbb",
+        textDecorationLine: 'line-through',
+        marginTop: 1,
     },
     addButton: {
-        width: 32,
-        height: 32,
-        borderRadius: 10,
-        backgroundColor: "#F0F9F4", // Light green background
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        backgroundColor: "#4CAF50",
         justifyContent: "center",
         alignItems: "center",
+        shadowColor: "#4CAF50",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 4,
     },
     bottomNavContainer: {
         position: "absolute",
@@ -727,10 +782,10 @@ const styles = StyleSheet.create({
         paddingVertical: 15,
         paddingHorizontal: 25,
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 5 },
+        shadowOffset: { width: 0, height: 10 },
         shadowOpacity: 0.1,
-        shadowRadius: 10,
-        elevation: 10,
+        shadowRadius: 20,
+        elevation: 15,
     },
     navItem: {
         alignItems: "center",
@@ -739,7 +794,7 @@ const styles = StyleSheet.create({
     },
     activeNavItem: {
         backgroundColor: "#E8F5E9",
-        borderRadius: 30, // Circular when no text
+        borderRadius: 30,
         width: 50,
         height: 50,
         paddingHorizontal: 0,
@@ -755,8 +810,8 @@ const styles = StyleSheet.create({
     },
     badgeContainer: {
         position: 'absolute',
-        top: -8,
-        right: -8,
+        top: -5,
+        right: -5,
         backgroundColor: '#FF3B30',
         borderRadius: 10,
         width: 18,
@@ -777,17 +832,22 @@ const styles = StyleSheet.create({
         justifyContent: "space-between",
     },
     gridCategoryCard: {
-        width: "23%", // 4 items per row approx
+        width: "23%",
         alignItems: "center",
         marginBottom: 20,
     },
     gridIconContainer: {
-        width: 70,
-        height: 70,
-        borderRadius: 20,
+        width: 65,
+        height: 65,
+        borderRadius: 22,
         justifyContent: "center",
         alignItems: "center",
         marginBottom: 8,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
     },
     gridIcon: {
         width: 40,
@@ -797,7 +857,7 @@ const styles = StyleSheet.create({
     gridCategoryName: {
         fontSize: 12,
         fontWeight: "600",
-        color: "#333",
+        color: "#555",
         textAlign: "center",
         lineHeight: 16,
     },

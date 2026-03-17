@@ -1,12 +1,13 @@
 import React, { useState } from "react";
-import { StyleSheet, Text, View, SectionList, TextInput, Image, TouchableOpacity, ScrollView, Animated, Dimensions } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { StyleSheet, Text, View, SectionList, TextInput, Image, TouchableOpacity, ScrollView, Animated, Dimensions, Platform, StatusBar, Modal } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import OrderHistory from '../components/OrderHistory';
 import Heart from './Heart';
 import Cart from './Cart';
-
+import Profile from './Profile';
 import { CATEGORIES } from "../data/categories";
 import { fruitsData } from "../data/fruits";
 import { vegetablesData } from "../data/vegetables";
@@ -16,7 +17,6 @@ import { snacksData } from "../data/snacks";
 import { beveragesData } from "../data/beverages";
 import { meatData } from "../data/meat";
 
-// Construct GROCERY_DATA from imported files
 const GROCERY_DATA = [
     {
         title: "Popular",
@@ -47,7 +47,7 @@ const GROCERY_DATA = [
         data: vegetablesData,
     },
     {
-        title: "Dairy", // Matches "Dairy" in categories.js (was "Dairy & Eggs")
+        title: "Dairy",
         data: dairyData,
     },
     {
@@ -66,20 +66,64 @@ const GROCERY_DATA = [
         title: "Meat",
         data: meatData,
     },
+
 ];
 
+const CategoryTabs = ({ selectedCategory, onSelectCategory }) => (
+    <View style={styles.categoriesHeaderContainer}>
+        <Text style={styles.sectionTitle}>Categories</Text>
+        <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoriesScrollContent}
+        >
+            {CATEGORIES.map((cat, index) => {
+                const isSelected = selectedCategory === cat.name;
+                return (
+                    <TouchableOpacity
+                        key={index}
+                        style={[
+                            styles.categoryPill,
+                            isSelected && styles.selectedCategoryPill,
+                        ]}
+                        onPress={() => onSelectCategory(cat.name)}
+                    >
+                        <View style={styles.categoryPillIcon}>
+                            <Ionicons
+                                name={cat.icon}
+                                size={18}
+                                color={isSelected ? "#FFF" : "#757575"}
+                            />
+                        </View>
+                        <Text style={[
+                            styles.categoryPillText,
+                            isSelected && styles.selectedCategoryPillText
+                        ]}>
+                            {cat.name}
+                        </Text>
+                    </TouchableOpacity>
+                );
+            })}
+        </ScrollView>
+    </View>
+);
+
 export default function MainPage() {
+    const insets = useSafeAreaInsets();
     const [searchText, setSearchText] = useState("");
     const [selectedCategory, setSelectedCategory] = useState("All");
-    const [showOrderHistory, setShowOrderHistory] = useState(false);
     const [cartItemCount, setCartItemCount] = useState(0);
     const [activeTab, setActiveTab] = useState("Home");
     const [favorites, setFavorites] = useState([]);
     const [toastVisible, setToastVisible] = useState(false);
     const [toastMessage, setToastMessage] = useState("");
-    const [toastType, setToastType] = useState("success"); // success or error
+    const [toastType, setToastType] = useState("success");
     const fadeAnim = React.useRef(new Animated.Value(0)).current;
     const slideAnim = React.useRef(new Animated.Value(100)).current;
+
+    const [address, setAddress] = useState("123 Main St, Mumbai");
+    const [showAddressModal, setShowAddressModal] = useState(false);
+    const [tempAddress, setTempAddress] = useState("");
 
     const showToast = (message, type = "success") => {
         setToastMessage(message);
@@ -117,6 +161,7 @@ export default function MainPage() {
 
     // Subscribe to cart and favorites changes
     React.useEffect(() => {
+        loadAddress();
         const unsubscribeCart = CartService.subscribe((cart) => {
             setCartItemCount(CartService.getItemCount());
         });
@@ -129,17 +174,45 @@ export default function MainPage() {
         };
     }, []);
 
-    const handleRepeatOrder = (items) => {
-        CartService.addItems(items);
-        setShowOrderHistory(false); // Go back to main page to see the cart update
+    const loadAddress = async () => {
+        try {
+            const savedAddress = await AsyncStorage.getItem('userAddress');
+            if (savedAddress) {
+                setAddress(savedAddress);
+            }
+        } catch (error) {
+            console.log('Error loading address:', error);
+        }
     };
 
-    if (showOrderHistory) {
+    const saveAddress = async () => {
+        if (!tempAddress.trim()) return;
+        try {
+            await AsyncStorage.setItem('userAddress', tempAddress);
+            setAddress(tempAddress);
+            setShowAddressModal(false);
+            showToast("Address updated successfully!");
+        } catch (error) {
+            console.log('Error saving address:', error);
+            showToast("Failed to save address", "error");
+        }
+    };
+
+    const handleOpenAddressModal = () => {
+        setTempAddress(address);
+        setShowAddressModal(true);
+    };
+
+    const handleRepeatOrder = (items) => {
+        CartService.addItems(items);
+        setActiveTab("Cart"); // Go to cart to see the added items
+    };
+
+    if (activeTab === "Orders") {
         return (
             <OrderHistory
-                orderService={OrderService}
                 onRepeatOrder={handleRepeatOrder}
-                onBack={() => setShowOrderHistory(false)}
+                onBack={() => setActiveTab("Home")}
             />
         );
     }
@@ -159,19 +232,29 @@ export default function MainPage() {
         return (
             <Cart
                 cartService={CartService}
-                orderService={OrderService}
                 onBack={() => setActiveTab("Home")}
-                onCheckoutSuccess={() => {
-                    setActiveTab("Home");
-                    setShowOrderHistory(true);
-                }}
             />
         );
     }
 
+    if (activeTab === "Profile") {
+        return (
+            <Profile
+                onBack={() => setActiveTab("Home")}
+                onLogout={() => { /* handle logout here */ }}
+            />
+        );
+    }
+
+    const isSearching = searchText.trim().length > 0;
+
     const filteredData = GROCERY_DATA.map((section) => {
         // Filter by selected category first
         if (selectedCategory !== "All" && section.title !== selectedCategory) {
+            return null;
+        }
+
+        if (isSearching && (section.title === "Popular" || section.title === "All")) {
             return null;
         }
 
@@ -189,25 +272,27 @@ export default function MainPage() {
         const isFavorite = favorites.some(fav => fav.name === item.name);
         return (
             <View key={item.name} style={styles.itemCard}>
-                <View style={styles.cardHeader}>
+                <View style={styles.imageHeaderContainer}>
                     {item.discount && (
                         <View style={styles.discountBadge}>
                             <Text style={styles.discountText}>{item.discount}</Text>
                         </View>
                     )}
-                    <View style={{ flex: 1 }} />
-                    <TouchableOpacity onPress={() => {
-                        const isAdded = FavoritesService.toggleFavorite(item);
-                        if (isAdded) {
-                            showToast("Added to favorites", "success");
-                        } else {
-                            showToast("Removed from favorites", "error");
-                        }
-                    }}>
+                    <TouchableOpacity
+                        style={styles.favoriteButton}
+                        onPress={() => {
+                            const isAdded = FavoritesService.toggleFavorite(item);
+                            if (isAdded) {
+                                showToast("Added to favorites", "success");
+                            } else {
+                                showToast("Removed from favorites", "error");
+                            }
+                        }}
+                    >
                         <Ionicons
                             name={isFavorite ? "heart" : "heart-outline"}
-                            size={20}
-                            color="#FF6B6B"
+                            size={18}
+                            color={isFavorite ? "#FF6B6B" : "#B0B0B0"}
                         />
                     </TouchableOpacity>
                 </View>
@@ -216,14 +301,21 @@ export default function MainPage() {
                     <Image source={{ uri: item.image }} style={styles.itemImage} />
                 </View>
 
-                <View style={styles.cardFooter}>
-                    <View>
-                        <Text style={styles.itemPrice}>{item.price}</Text>
-                        <Text style={styles.itemWeight}>for {item.weight}</Text>
+                <View style={styles.itemInfoContainer}>
+                    <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
+                    <Text style={styles.itemWeight}>{item.weight}</Text>
+
+                    <View style={styles.priceContainer}>
+                        <View>
+                            <Text style={styles.itemPrice}>{item.price}</Text>
+                            {item.originalPrice && (
+                                <Text style={styles.originalPrice}>{item.originalPrice}</Text>
+                            )}
+                        </View>
+                        <TouchableOpacity style={styles.addButton} onPress={() => CartService.addItem(item)}>
+                            <Ionicons name="add" size={24} color="#fff" />
+                        </TouchableOpacity>
                     </View>
-                    <TouchableOpacity style={styles.addButton} onPress={() => CartService.addItem(item)}>
-                        <Ionicons name="add" size={24} color="#4CAF50" />
-                    </TouchableOpacity>
                 </View>
             </View>
         );
@@ -235,7 +327,7 @@ export default function MainPage() {
             { name: 'Profile', icon: 'person', id: 'Profile' },
             { name: 'Home', icon: 'home', id: 'Home' },
             { name: 'Favorites', icon: 'heart', id: 'Favorites' },
-            { name: 'Menu', icon: 'menu', id: 'Menu' },
+            { name: 'Orders', icon: 'receipt', id: 'Orders' },
         ];
 
         return (
@@ -268,70 +360,137 @@ export default function MainPage() {
         );
     };
 
-    const ListHeader = () => (
-        <View>
-            <Text style={styles.sectionTitle}>Categories</Text>
-            <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.categoriesScroll}
+    const renderAddressModal = () => (
+        <Modal
+            transparent
+            visible={showAddressModal}
+            animationType="fade"
+            onRequestClose={() => setShowAddressModal(false)}
+        >
+            <TouchableOpacity
+                style={styles.modalOverlay}
+                activeOpacity={1}
+                onPress={() => setShowAddressModal(false)}
             >
-                {CATEGORIES.map((cat, index) => (
-                    <TouchableOpacity
-                        key={index}
-                        style={[
-                            styles.categoryCard,
-                            { backgroundColor: cat.color },
-                            selectedCategory === cat.name && styles.selectedCategoryCard,
-                        ]}
-                        onPress={() => setSelectedCategory(cat.name)}
-                    >
-                        <Ionicons name={cat.icon} size={24} color="#1A1A1A" style={{ marginBottom: 8 }} />
-                        <Text style={styles.categoryName}>{cat.name}</Text>
+                <View style={styles.modalContent}>
+                    <View style={styles.modalHeader}>
+                        <Text style={styles.modalTitle}>Delivery Address</Text>
+                        <TouchableOpacity onPress={() => setShowAddressModal(false)} style={styles.closeButton}>
+                            <Ionicons name="close" size={24} color="#1A1A1A" />
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.modalBody}>
+                        <Text style={styles.inputLabel}>Enter full address</Text>
+                        <TextInput
+                            style={styles.addressInput}
+                            placeholder="e.g. 123 Main St, Apartment 4B"
+                            value={tempAddress}
+                            onChangeText={setTempAddress}
+                            multiline
+                            numberOfLines={3}
+                            autoFocus
+                        />
+                    </View>
+
+                    <TouchableOpacity style={styles.saveButton} onPress={saveAddress}>
+                        <Text style={styles.saveButtonText}>Update Delivery Location</Text>
                     </TouchableOpacity>
-                ))}
-            </ScrollView>
-        </View >
+                </View>
+            </TouchableOpacity>
+        </Modal>
     );
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
             {/* Top Header */}
-            <View style={styles.topHeader}>
-                <Text style={styles.topHeaderTitle}>Grocery Shopping</Text>
+            <View style={[styles.topHeader, { paddingTop: Math.max(insets.top, 20) }]}>
+                <View style={styles.headerLeft}>
+                    <Text style={styles.deliverToLabel}>Deliver to</Text>
+                    <TouchableOpacity style={styles.locationContainer} onPress={handleOpenAddressModal}>
+                        <Text style={styles.locationValue} numberOfLines={1}>{address}</Text>
+                        <Ionicons name="chevron-down" size={14} color="#4CAF50" />
+                    </TouchableOpacity>
+                </View>
                 <TouchableOpacity
-                    style={styles.ordersButton}
-                    onPress={() => setShowOrderHistory(true)}
+                    style={styles.profileButton}
+                    onPress={() => setActiveTab("Profile")}
                 >
-                    <Ionicons name="receipt-outline" size={24} color="#2c3e50" />
+                    <Ionicons name="person-circle-outline" size={32} color="#1A1A1A" />
                 </TouchableOpacity>
             </View>
 
             {/* Search Bar */}
             <View style={styles.searchContainer}>
+                <Ionicons name="search" size={20} color="#888" style={styles.searchIcon} />
                 <TextInput
                     style={styles.searchInput}
-                    placeholder="Search items..."
+                    placeholder="Search for groceries..."
                     value={searchText}
                     onChangeText={setSearchText}
+                    placeholderTextColor="#999"
                 />
+                {searchText.length > 0 && (
+                    <TouchableOpacity onPress={() => setSearchText("")} style={styles.clearIcon}>
+                        <Ionicons name="close-circle" size={20} color="#888" />
+                    </TouchableOpacity>
+                )}
             </View>
+
+            {renderAddressModal()}
 
             {/* Content */}
             <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
-                {selectedCategory === "All" ? (
+                {!isSearching && selectedCategory === "All" ? (
                     <>
-                        {/* Banner */}
-                        <View style={styles.bannerContainer}>
-                            <Image
-                                source={{ uri: "https://img.freepik.com/free-photo/shopping-basket-with-grocery-products_23-2148102377.jpg" }}
-                                style={styles.bannerImage}
-                            />
-                            <View style={styles.bannerOverlay}>
-                                <Text style={styles.bannerText}>Fresh Groceries</Text>
-                                <Text style={styles.bannerSubtext}>Delivered in 10 mins</Text>
+                        {/* Banner Carousel */}
+                        <ScrollView
+                            horizontal
+                            pagingEnabled
+                            showsHorizontalScrollIndicator={false}
+                            style={styles.bannerScroll}
+                        >
+                            <View style={styles.bannerContainer}>
+                                <Image
+                                    source={{ uri: "https://images.unsplash.com/photo-1612927601601-6638404737ce?w=900&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8Zm9vZCUyMHBob3RvfGVufDB8fDB8fHww" }}
+                                    style={styles.bannerImage}
+                                />
+                                <View style={styles.bannerOverlay}>
+                                    <Text style={styles.bannerText}>Fresh Groceries</Text>
+                                    <Text style={styles.bannerSubtext}>Delivered in 10 mins</Text>
+                                </View>
                             </View>
-                        </View>
+                            <View style={styles.bannerContainer}>
+                                <Image
+                                    source={{ uri: "https://plus.unsplash.com/premium_photo-1673590981770-307f61735af8?w=900&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NDF8fGZvb2QlMjBwaG90b3xlbnwwfHwwfHx8MA%3D%3D" }}
+                                    style={styles.bannerImage}
+                                />
+                                <View style={styles.bannerOverlay}>
+                                    <Text style={styles.bannerText}>Quality Food</Text>
+                                    <Text style={styles.bannerSubtext}>Best prices guaranteed</Text>
+                                </View>
+                            </View>
+                            <View style={styles.bannerContainer}>
+                                <Image
+                                    source={{ uri: "https://plus.unsplash.com/premium_photo-1671379041175-782d15092945?w=900&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MXx8ZnJ1aXRzfGVufDB8fDB8fHww" }}
+                                    style={styles.bannerImage}
+                                />
+                                <View style={styles.bannerOverlay}>
+                                    <Text style={styles.bannerText}>Fresh Fruits</Text>
+                                    <Text style={styles.bannerSubtext}>Organic & healthy</Text>
+                                </View>
+                            </View>
+                            <View style={styles.bannerContainer}>
+                                <Image
+                                    source={{ uri: "https://plus.unsplash.com/premium_photo-1664640733890-17acaf0529a5?w=900&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NDV8fHZlZ2V0YWJsZXN8ZW58MHx8MHx8fDA%3D" }}
+                                    style={styles.bannerImage}
+                                />
+                                <View style={styles.bannerOverlay}>
+                                    <Text style={styles.bannerText}>Farm Fresh Vegetables</Text>
+                                    <Text style={styles.bannerSubtext}>Straight from the farm</Text>
+                                </View>
+                            </View>
+                        </ScrollView>
 
                         <View style={styles.sectionContainer}>
                             <Text style={styles.sectionTitle}>Grocery & Kitchen</Text>
@@ -350,10 +509,6 @@ export default function MainPage() {
                                 ))}
                             </View>
                         </View>
-
-                        {/* Show Popular items or other sections for "All" view if desired, 
-                            or just the categories as the main entry point. 
-                            Let's show "Popular" below the categories for quick access. */}
                         {GROCERY_DATA.map((section) => (
                             <View key={section.title} style={styles.sectionContainer}>
                                 <Text style={styles.sectionTitle}>{section.title}</Text>
@@ -365,7 +520,12 @@ export default function MainPage() {
                     </>
                 ) : (
                     <>
-                        <ListHeader />
+                        {!isSearching && <CategoryTabs selectedCategory={selectedCategory} onSelectCategory={setSelectedCategory} />}
+                        {isSearching && (
+                            <View style={styles.categoriesHeaderContainer}>
+                                <Text style={styles.sectionTitle}>Search Results</Text>
+                            </View>
+                        )}
                         {filteredData.map((section) => (
                             <View key={section.title} style={styles.sectionContainer}>
                                 <Text style={styles.sectionTitle}>{section.title}</Text>
@@ -376,21 +536,22 @@ export default function MainPage() {
                         ))}
                         {filteredData.length === 0 && (
                             <View style={styles.emptyState}>
-                                <Text style={styles.emptyStateText}>No items found in {selectedCategory}</Text>
-                                <TouchableOpacity onPress={() => setSelectedCategory("All")} style={styles.backButton}>
-                                    <Text style={styles.backButtonText}>Browse all categories</Text>
+                                <Text style={styles.emptyStateText}>
+                                    {isSearching ? `No results found for "${searchText}"` : `No items found in ${selectedCategory}`}
+                                </Text>
+                                <TouchableOpacity onPress={() => {
+                                    if(isSearching) setSearchText("");
+                                    else setSelectedCategory("All");
+                                }} style={styles.backButton}>
+                                    <Text style={styles.backButtonText}>{isSearching ? "Clear Search" : "Browse all categories"}</Text>
                                 </TouchableOpacity>
                             </View>
                         )}
                     </>
                 )}
             </ScrollView>
-
-            {/* Bottom Navigation */}
-            {/* Bottom Navigation */}
             <BottomNavBar />
 
-            {/* Toast Notification */}
             {toastVisible && (
                 <Animated.View
                     style={[
@@ -423,94 +584,146 @@ export default function MainPage() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "#f8f9fa",
+        backgroundColor: "#F4F6F8",
     },
     topHeader: {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        backgroundColor: "#fff",
-        borderBottomWidth: 1,
-        borderBottomColor: "#f0f0f0",
-    },
-    topHeaderTitle: {
-        fontSize: 24,
-        fontWeight: "800",
-        color: "#1A1A1A",
-        letterSpacing: -0.5,
-    },
-    ordersButton: {
-        padding: 10,
-        borderRadius: 12,
-        backgroundColor: "#F5F5F5",
-    },
-    searchContainer: {
         paddingHorizontal: 20,
         paddingBottom: 15,
         backgroundColor: "#fff",
-        borderBottomLeftRadius: 24,
-        borderBottomRightRadius: 24,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 10,
-        elevation: 5,
-        zIndex: 10,
+        // borderBottomWidth removed to make search bar blend with header nicely
+    },
+    headerLeft: {
+        flex: 1,
+        justifyContent: 'center',
+    },
+    deliverToLabel: {
+        fontSize: 12,
+        fontWeight: "600",
+        color: "#888",
+        textTransform: "uppercase",
+        letterSpacing: 0.5,
+    },
+    locationContainer: {
+        flexDirection: "row",
+        alignItems: "center",
+        marginTop: 2,
+    },
+    locationValue: {
+        fontSize: 16,
+        fontWeight: "700",
+        color: "#1A1A1A",
+        marginRight: 4,
+    },
+    profileButton: {
+        padding: 4,
+        backgroundColor: "#f5f5f5",
+        borderRadius: 20,
+    },
+    searchContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F5F6F8',
+        marginHorizontal: 20,
+        marginBottom: 15,
+        paddingHorizontal: 15,
+        borderRadius: 16,
+        height: 50,
+        borderWidth: 1,
+        borderColor: '#EBEBEB',
+    },
+    searchIcon: {
+        marginRight: 10,
     },
     searchInput: {
-        height: 50,
-        backgroundColor: "#F3F4F6",
-        borderRadius: 16,
-        paddingHorizontal: 20,
-        fontSize: 16,
-        color: "#1A1A1A",
-        borderWidth: 0,
+        flex: 1,
+        fontSize: 15,
+        color: '#1A1A1A',
+        height: '100%',
+    },
+    clearIcon: {
+        padding: 5,
     },
     listContent: {
-        paddingHorizontal: 20,
-        paddingBottom: 100, // Extra padding for bottom nav
+        paddingHorizontal: 16,
+        paddingBottom: 100,
+        paddingTop: 10,
     },
     sectionContainer: {
         marginBottom: 25,
     },
     sectionTitle: {
-        fontSize: 20,
+        fontSize: 19,
         fontWeight: "700",
-        color: "#1A1A1A",
+        color: "#2C3E50",
         marginBottom: 15,
+        letterSpacing: 0.3,
     },
-    categoriesScroll: {
+    categoriesHeaderContainer: {
         marginBottom: 20,
     },
+    categoriesScrollContent: {
+        paddingRight: 20,
+    },
+    categoryPill: {
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: "#F5F5F5",
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderRadius: 30,
+        marginRight: 10,
+        elevation: 0,
+    },
+    selectedCategoryPill: {
+        backgroundColor: "#4CAF50",
+        shadowColor: "#4CAF50",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 5,
+    },
+    categoryPillIcon: {
+        marginRight: 6,
+    },
+    categoryPillText: {
+        fontSize: 14,
+        fontWeight: "600",
+        color: "#757575",
+    },
+    selectedCategoryPillText: {
+        color: "#FFF",
+        fontWeight: "700",
+    },
     categoryCard: {
-        width: 80,
-        height: 90,
-        marginRight: 12,
-        borderRadius: 16,
+        width: 105,
+        height: 120,
+        marginRight: 16,
+        borderRadius: 24,
         alignItems: "center",
         justifyContent: "center",
-        padding: 8,
+        padding: 12,
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 10,
+        elevation: 3,
     },
     selectedCategoryCard: {
         borderWidth: 2,
         borderColor: "#4CAF50",
+        shadowOpacity: 0.15,
+        elevation: 6,
     },
-    categoryImage: {
-        width: 40,
-        height: 40,
-        marginBottom: 8,
+    categoryIconWrapper: {
+        marginBottom: 10,
     },
     categoryName: {
-        fontSize: 11,
-        fontWeight: "600",
-        color: "#333",
+        fontSize: 13,
+        fontWeight: "700",
+        color: "#1A1A1A",
         textAlign: "center",
     },
     gridContainer: {
@@ -522,62 +735,93 @@ const styles = StyleSheet.create({
         width: "48%",
         backgroundColor: "#fff",
         borderRadius: 20,
-        padding: 12,
+        padding: 10,
         marginBottom: 16,
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.06,
+        shadowRadius: 10,
         elevation: 3,
+        borderWidth: 1,
+        borderColor: "#f0f0f0",
     },
-    cardHeader: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "flex-start",
-        marginBottom: 8,
+    imageHeaderContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        zIndex: 1,
+        height: 24,
+    },
+    discountBadge: {
+        backgroundColor: '#FF6B6B',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 8,
+        justifyContent: 'center',
+    },
+    discountText: {
+        color: '#fff',
+        fontSize: 10,
+        fontWeight: '700',
+    },
+    favoriteButton: {
+        padding: 4,
     },
     itemImageContainer: {
         width: "100%",
-        height: 120,
+        height: 110,
         justifyContent: "center",
         alignItems: "center",
-        marginBottom: 12,
+        marginVertical: 5,
     },
     itemImage: {
-        width: "100%",
+        width: "90%",
         height: "100%",
-        resizeMode: "cover",
-        borderRadius: 12,
+        resizeMode: "contain",
+    },
+    itemInfoContainer: {
+        marginTop: 5,
     },
     itemName: {
-        fontSize: 15,
+        fontSize: 14,
         fontWeight: "700",
-        color: "#1A1A1A",
-        flex: 1,
-        marginRight: 4,
+        color: "#333",
+        marginBottom: 2,
+        height: 38,
     },
-    cardFooter: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
+    itemWeight: {
+        fontSize: 11,
+        color: "#999",
+        fontWeight: "500",
+        marginBottom: 8,
+    },
+    priceContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-end',
     },
     itemPrice: {
         fontSize: 16,
         fontWeight: "800",
         color: "#1A1A1A",
     },
-    itemWeight: {
+    originalPrice: {
         fontSize: 12,
-        color: "#888",
-        fontWeight: "500",
+        color: "#bbb",
+        textDecorationLine: 'line-through',
+        marginTop: 1,
     },
     addButton: {
-        width: 32,
-        height: 32,
-        borderRadius: 10,
-        backgroundColor: "#F0F9F4", // Light green background
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        backgroundColor: "#4CAF50",
         justifyContent: "center",
         alignItems: "center",
+        shadowColor: "#4CAF50",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 4,
     },
     bottomNavContainer: {
         position: "absolute",
@@ -592,10 +836,10 @@ const styles = StyleSheet.create({
         paddingVertical: 15,
         paddingHorizontal: 25,
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 5 },
+        shadowOffset: { width: 0, height: 10 },
         shadowOpacity: 0.1,
-        shadowRadius: 10,
-        elevation: 10,
+        shadowRadius: 20,
+        elevation: 15,
     },
     navItem: {
         alignItems: "center",
@@ -604,7 +848,7 @@ const styles = StyleSheet.create({
     },
     activeNavItem: {
         backgroundColor: "#E8F5E9",
-        borderRadius: 30, // Circular when no text
+        borderRadius: 30,
         width: 50,
         height: 50,
         paddingHorizontal: 0,
@@ -620,8 +864,8 @@ const styles = StyleSheet.create({
     },
     badgeContainer: {
         position: 'absolute',
-        top: -8,
-        right: -8,
+        top: -5,
+        right: -5,
         backgroundColor: '#FF3B30',
         borderRadius: 10,
         width: 18,
@@ -642,17 +886,22 @@ const styles = StyleSheet.create({
         justifyContent: "space-between",
     },
     gridCategoryCard: {
-        width: "23%", // 4 items per row approx
+        width: "23%",
         alignItems: "center",
         marginBottom: 20,
     },
     gridIconContainer: {
-        width: 70,
-        height: 70,
-        borderRadius: 20,
+        width: 65,
+        height: 65,
+        borderRadius: 22,
         justifyContent: "center",
         alignItems: "center",
         marginBottom: 8,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
     },
     gridIcon: {
         width: 40,
@@ -662,7 +911,7 @@ const styles = StyleSheet.create({
     gridCategoryName: {
         fontSize: 12,
         fontWeight: "600",
-        color: "#333",
+        color: "#555",
         textAlign: "center",
         lineHeight: 16,
     },
@@ -685,8 +934,14 @@ const styles = StyleSheet.create({
         color: "#fff",
         fontWeight: "600",
     },
-    bannerContainer: {
+    bannerScroll: {
         marginVertical: 20,
+        marginHorizontal: -20,
+        paddingLeft: 20,
+    },
+    bannerContainer: {
+        width: 350,
+        marginHorizontal: 10,
         borderRadius: 20,
         overflow: 'hidden',
         height: 180,
@@ -702,19 +957,27 @@ const styles = StyleSheet.create({
         position: 'absolute',
         bottom: 20,
         left: 20,
-        backgroundColor: 'rgba(255,255,255,0.9)',
-        paddingHorizontal: 15,
-        paddingVertical: 10,
-        borderRadius: 12,
+        right: 20,
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        paddingHorizontal: 20,
+        paddingVertical: 15,
+        borderRadius: 16,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 5,
     },
     bannerText: {
-        fontSize: 18,
+        fontSize: 22,
         fontWeight: '800',
-        color: '#1A1A1A',
+        color: '#fff',
+        marginBottom: 4,
+        letterSpacing: 0.5,
     },
     bannerSubtext: {
-        fontSize: 12,
-        color: '#4CAF50',
+        fontSize: 14,
+        color: '#E8F5E9',
         fontWeight: '600',
     },
     toastContainer: {
@@ -763,6 +1026,69 @@ const styles = StyleSheet.create({
         color: '#666',
         fontSize: 13,
         fontWeight: '500',
+    },
+    // Address Modal Styles
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        padding: 20,
+    },
+    modalContent: {
+        backgroundColor: '#fff',
+        borderRadius: 24,
+        padding: 24,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.25,
+        shadowRadius: 20,
+        elevation: 10,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: '#1A1A1A',
+    },
+    closeButton: {
+        padding: 4,
+    },
+    modalBody: {
+        marginBottom: 24,
+    },
+    inputLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#666',
+        marginBottom: 10,
+    },
+    addressInput: {
+        backgroundColor: '#F5F6F8',
+        borderRadius: 12,
+        padding: 15,
+        fontSize: 15,
+        color: '#1A1A1A',
+        minHeight: 80,
+        textAlignVertical: 'top',
+        borderWidth: 1,
+        borderColor: '#EBEBEB',
+    },
+    saveButton: {
+        backgroundColor: '#4CAF50',
+        borderRadius: 12,
+        height: 54,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    saveButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '700',
     },
 });
 
@@ -824,7 +1150,7 @@ class CartServiceImpl {
     // Get cart total
     getTotal() {
         return this.cart.reduce((total, item) => {
-            const price = parseFloat(item.price.replace(/[^0-9.]/g, ''));
+            const price = parseFloat(item.price.replace(/[^\d.]/g, ''));
             return total + (price * item.quantity);
         }, 0);
     }
@@ -902,85 +1228,3 @@ class FavoritesServiceImpl {
 }
 
 export const FavoritesService = new FavoritesServiceImpl();
-
-// Order Service
-class OrderServiceImpl {
-    constructor() {
-        this.orders = [
-            {
-                id: "ORD001",
-                date: "2024-01-15",
-                status: "Delivered",
-                total: "₹48.50",
-                items: [
-                    { name: "Fresh Apples", price: "₹12.00", quantity: 1, image: "https://images.unsplash.com/photo-1568702846914-96b305d2aaeb?w=400" },
-                    { name: "Organic Milk", price: "₹6.50", quantity: 2, image: "https://images.unsplash.com/photo-1550583724-b2692b85b150?w=400" }
-                ],
-                deliveryTime: "8 mins",
-                deliveryAddress: "123 Main St, Apartment 4B, Mumbai",
-            }
-        ];
-        this.listeners = [];
-    }
-
-    placeOrder(items, total, address = "123 Main St, Apartment 4B, Mumbai", payment = "Cash on Delivery") {
-        const newOrder = {
-            id: `ORD${Math.floor(Math.random() * 10000)}`,
-            date: new Date().toISOString().split('T')[0],
-            status: "Pending",
-            total: `₹${total}`,
-            items: [...items],
-            deliveryTime: "Calculating...",
-            deliveryAddress: address,
-            paymentMethod: payment
-        };
-
-        this.orders.unshift(newOrder);
-        this.notifyListeners();
-        this.simulateOrderProgress(newOrder.id);
-        return newOrder;
-    }
-
-    simulateOrderProgress(orderId) {
-        const stages = ["Accepted", "Out for Delivery", "Delivered"];
-        let currentStage = 0;
-
-        const interval = setInterval(() => {
-            if (currentStage >= stages.length) {
-                clearInterval(interval);
-                return;
-            }
-
-            this.updateStatus(orderId, stages[currentStage]);
-            currentStage++;
-        }, 5000); // Update every 5 seconds for demo
-    }
-
-    updateStatus(orderId, status) {
-        const order = this.orders.find(o => o.id === orderId);
-        if (order) {
-            order.status = status;
-            if (status === "Delivered") {
-                order.deliveryTime = "Just now";
-            }
-            this.notifyListeners();
-        }
-    }
-
-    getOrders() {
-        return this.orders;
-    }
-
-    subscribe(listener) {
-        this.listeners.push(listener);
-        return () => {
-            this.listeners = this.listeners.filter(l => l !== listener);
-        };
-    }
-
-    notifyListeners() {
-        this.listeners.forEach(listener => listener([...this.orders]));
-    }
-}
-
-export const OrderService = new OrderServiceImpl();
